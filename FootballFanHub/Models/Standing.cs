@@ -1,5 +1,4 @@
-﻿namespacenamespace FootballFanHub.Models;
-
+﻿namespace FootballFanHub.Models;
 public class Standing : IComparable<Standing>
 {
     public int Rank { get; set; }
