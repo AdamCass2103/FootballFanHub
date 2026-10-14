@@ -32,13 +32,13 @@ h1:focus {
     }
 
 /* Sidebar */
-.sidebar {
+.app-sidebar {
     background: #ffffff;
     border-right: 1px solid #e3e7eb;
     min-height: calc(100vh - 72px);
 }
 
-    .sidebar .nav-link {
+    .app-sidebar .nav-link {
         color: #333;
         border-radius: 6px;
         margin: 4px 8px;
@@ -46,39 +46,47 @@ h1:focus {
         font-weight: 500;
     }
 
-        .sidebar .nav-link:hover {
+        .app-sidebar .nav-link:hover {
             background-color: #eef6f0;
             color: #0b6623;
         }
 
-        .sidebar .nav-link.active {
+        .app-sidebar .nav-link.active {
             background-color: #0b6623;
             color: white;
         }
 
+@media (max-width: 767.98px) {
+    .app-sidebar {
+        min-height: 0;
+        border-right: none;
+        border-bottom: 1px solid #e3e7eb;
+    }
+}
+
 /* Page content */
-.page {
+.content-area {
     padding: 1.5rem 2rem;
 }
 
-    .page h3 {
+    .content-area h3 {
         font-weight: 700;
         margin-bottom: 1.25rem;
         color: #0b6623;
     }
 
-/* Cards */
-.card {
-    border: 1px solid #e3e7eb;
-    border-radius: 10px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-    .card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 14px rgba(0,0,0,0.1);
+    /* Cards */
+    .content-area .card {
+        border: 1px solid #e3e7eb;
+        border-radius: 10px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
+
+        .content-area .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 14px rgba(0,0,0,0.1);
+        }
 
 .card-body h6 {
     font-weight: 700;
@@ -87,13 +95,17 @@ h1:focus {
 
 /* Standings table */
 .standings-table {
+    --bs-table-bg: #ffffff;
     background: white;
     border-radius: 10px;
     overflow: hidden;
+    border-collapse: separate;
+    border-spacing: 0;
     box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
 
-    .standings-table thead {
+    .standings-table thead th {
+        --bs-table-bg: #0b6623;
         background-color: #0b6623;
         color: white;
     }
@@ -106,11 +118,10 @@ h1:focus {
 
     .standings-table tbody tr {
         cursor: pointer;
-        transition: background-color 0.1s ease;
     }
 
-        .standings-table tbody tr:hover {
-            background-color: #eef6f0;
+        .standings-table tbody tr:hover > * {
+            --bs-table-bg-state: #eef6f0;
         }
 
     .standings-table img.team-badge {
@@ -126,7 +137,7 @@ h1:focus {
     color: #666;
 }
 
-.alert {
+.content-area .alert {
     border-radius: 8px;
 }
 
