@@ -1,10 +1,18 @@
 using FootballFanHub.Components;
+using FootballFanHub.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddHttpClient<IStandingsService, FootballDataStandingsService>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["FootballData:BaseUrl"]!);
+    client.DefaultRequestHeaders.Add("X-Auth-Token", builder.Configuration["FootballData:ApiKey"] ?? "");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 var app = builder.Build();
 

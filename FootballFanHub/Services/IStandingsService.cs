@@ -1,6 +1,8 @@
-﻿namespace FootballFanHub.Services
+﻿using FootballFanHub.Models;
+
+namespace FootballFanHub.Services;
+
+public interface IStandingsService
 {
-    public class IStandingsService
-    {
-    }
+    Task<List<TeamStanding>> GetStandingsAsync(string competitionCode);
 }

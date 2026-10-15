@@ -1,52 +1,91 @@
 ﻿@page "/standings"
+@rendermode InteractiveServer
+@inject IStandingsService StandingsService
 
 <h3>League Standings</h3>
 
-<select class="form-select league-picker">
-    <option>Premier League</option>
-    <option>La Liga</option>
-    <option>Serie A</option>
+<select class="form-select league-picker" @bind="selectedLeague" @bind:after="LoadAsync">
+    @foreach (var league in leagues)
+    {
+        <option value="@league.Key">@league.Value</option>
+    }
 </select>
 
-<table class="table standings-table">
-    <thead>
-        <tr>
-            <th>#</th>
-            <th>Team</th>
-            <th>P</th>
-            <th>W</th>
-            <th>D</th>
-            <th>L</th>
-            <th>GD</th>
-            <th>Pts</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>1</td>
-            <td><span style="font-size:1.2rem"></span> Liverpool</td>
-            <td>20</td><td>14</td><td>4</td><td>2</td><td>+25</td><td><strong>46</strong></td>
-        </tr>
-        <tr>
-            <td>2</td>
-            <td><span style="font-size:1.2rem"></span> Arsenal</td>
-            <td>20</td><td>13</td><td>5</td><td>2</td><td>+22</td><td><strong>44</strong></td>
-        </tr>
-        <tr>
-            <td>3</td>
-            <td><span style="font-size:1.2rem"></span> Man City</td>
-            <td>20</td><td>12</td><td>4</td><td>4</td><td>+18</td><td><strong>40</strong></td>
-        </tr>
-        <tr>
-            <td>4</td>
-            <td><span style="font-size:1.2rem"></span> Aston Villa</td>
-            <td>20</td><td>11</td><td>4</td><td>5</td><td>+10</td><td><strong>37</strong></td>
-        </tr>
-        <tr>
-            <td>5</td>
-            <td><span style="font-size:1.2rem"></span> Tottenham</td>
-            <td>20</td><td>10</td><td>3</td><td>7</td><td>+6</td><td><strong>33</strong></td>
-        </tr>
-    </tbody>
-</table>
+@if (loading)
+{
+    <div class="loading-box">Loading standings…</div>
+}
+else if (error != null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (table.Count > 0)
+{
+    <table class="table standings-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Team</th>
+                <th>P</th>
+                <th>W</th>
+                <th>D</th>
+                <th>L</th>
+                <th>GD</th>
+                <th>Pts</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var t in table)
+            {
+                <tr>
+                    <td>@t.Position</td>
+                    <td><img class="team-badge" src="@t.CrestUrl" alt="" /> @t.TeamName</td>
+                    <td>@t.Played</td>
+                    <td>@t.Won</td>
+                    <td>@t.Drawn</td>
+                    <td>@t.Lost</td>
+                    <td>@t.GoalDifference</td>
+                    <td><strong>@t.Points</strong></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
 
+@code {
+    // League code -> display name. Codes are football-data.org's own.
+    private readonly Dictionary<string, string> leagues = new()
+    {
+        ["PL"] = "Premier League",
+        ["PD"] = "La Liga",
+        ["SA"] = "Serie A",
+        ["BL1"] = "Bundesliga",
+        ["FL1"] = "Ligue 1"
+    };
+
+    private string selectedLeague = "PL";
+    private List<TeamStanding> table = new();
+    private bool loading;
+    private string? error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            table = await StandingsService.GetStandingsAsync(selectedLeague);
+        }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+            table = new();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+}
