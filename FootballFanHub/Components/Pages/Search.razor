@@ -1,5 +1,73 @@
-﻿<h3>Search</h3>
+﻿@page "/search"
+@rendermode InteractiveServer
+@inject ITeamService TeamService
+
+<h3>Search Teams</h3>
+
+<input class="form-control mb-3" style="max-width:360px" placeholder="Search for a club…"
+       @bind="query" @bind:event="oninput" />
+
+@if (error != null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (!loaded)
+{
+    <div class="loading-box">Loading clubs…</div>
+}
+else if (string.IsNullOrWhiteSpace(query))
+{
+    <p class="text-muted">Type a club name to search @allTeams.Count clubs from Europe's top 5 leagues.</p>
+}
+else if (Results.Count == 0)
+{
+    <p class="text-muted">No clubs match "@query".</p>
+}
+else
+{
+    <div class="row">
+        @foreach (var t in Results)
+        {
+            <div class="col-md-4 mb-3">
+                <a href="/team/@t.Id" class="text-decoration-none text-reset">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <img src="@t.CrestUrl" alt="" style="height:56px" />
+                            <h6 class="mt-2">@t.ShortName</h6>
+                            <small class="text-muted">@t.League · @t.Venue</small>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}
 
 @code {
+    private List<TeamSummary> allTeams = new();
+    private string query = "";
+    private bool loaded;
+    private string? error;
 
+    private List<TeamSummary> Results =>
+        allTeams.Where(t => t.Name.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)
+                         || t.ShortName.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase))
+                .Take(18)
+                .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allTeams = await TeamService.GetAllTeamsAsync();
+        }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loaded = true;
+        }
+    }
 }
