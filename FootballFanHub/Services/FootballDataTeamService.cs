@@ -1,5 +1,7 @@
-﻿using FootballFanHub.Models;
+﻿using FootballFanHub.Exceptions;
+using FootballFanHub.Models;
 using Microsoft.Extensions.Caching.Memory;
+using System.Text.Json;
 
 namespace FootballFanHub.Services;
 
@@ -14,6 +16,9 @@ public class FootballDataTeamService : ITeamService
         ["SA"] = "Serie A",
         ["FL1"] = "Ligue 1"
     };
+
+    private static readonly SemaphoreSlim _loadLock = new(1, 1);
+    private static readonly string CacheFolder = Path.Combine(Directory.GetCurrentDirectory(), "CacheData");
 
     private readonly HttpClient _http;
     private readonly IMemoryCache _cache;
@@ -31,24 +36,61 @@ public class FootballDataTeamService : ITeamService
         if (_cache.TryGetValue(key, out List<TeamSummary>? cached) && cached is not null)
             return cached;
 
-        var teams = new List<TeamSummary>();
-        foreach (var (code, leagueName) in Leagues)
+        // Only one load at a time, so two page loads can't both fire five calls
+        await _loadLock.WaitAsync();
+        try
         {
-            var data = await _http.GetFromFootballDataAsync<TeamsResponse>($"competitions/{code}/teams");
-            teams.AddRange(data.Teams.Select(t => new TeamSummary
+            if (_cache.TryGetValue(key, out cached) && cached is not null)
+                return cached;
+
+            var teams = new List<TeamSummary>();
+            ApiException? lastError = null;
+
+            foreach (var (code, leagueName) in Leagues)
             {
-                Id = t.Id,
-                Name = t.Name,
-                ShortName = string.IsNullOrEmpty(t.ShortName) ? t.Name : t.ShortName,
-                CrestUrl = t.Crest,
-                Venue = t.Venue ?? "",
-                League = leagueName
-            }));
+                try { teams.AddRange(await LoadLeagueTeamsAsync(code, leagueName)); }
+                catch (ApiException ex) { lastError = ex; }   // keep going with the other leagues
+            }
+
+            if (teams.Count == 0 && lastError != null) throw lastError;
+
+            teams.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+
+            // Only keep it in memory if every league loaded; otherwise the next visit retries the missing ones
+            if (lastError == null) _cache.Set(key, teams, TimeSpan.FromHours(24));
+            return teams;
+        }
+        finally
+        {
+            _loadLock.Release();
+        }
+    }
+
+    private async Task<List<TeamSummary>> LoadLeagueTeamsAsync(string code, string leagueName)
+    {
+        var file = Path.Combine(CacheFolder, $"teams-{code}.json");
+
+        // Use the saved file if it's less than 24 hours old
+        if (File.Exists(file) && DateTime.UtcNow - File.GetLastWriteTimeUtc(file) < TimeSpan.FromHours(24))
+        {
+            var saved = JsonSerializer.Deserialize<List<TeamSummary>>(await File.ReadAllTextAsync(file));
+            if (saved is { Count: > 0 }) return saved;
         }
 
-        teams.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-        _cache.Set(key, teams, TimeSpan.FromHours(24));
-        return teams;
+        var data = await _http.GetFromFootballDataAsync<TeamsResponse>($"competitions/{code}/teams");
+        var list = data.Teams.Select(t => new TeamSummary
+        {
+            Id = t.Id,
+            Name = t.Name,
+            ShortName = string.IsNullOrEmpty(t.ShortName) ? t.Name : t.ShortName,
+            CrestUrl = t.Crest,
+            Venue = t.Venue ?? "",
+            League = leagueName
+        }).ToList();
+
+        Directory.CreateDirectory(CacheFolder);
+        await File.WriteAllTextAsync(file, JsonSerializer.Serialize(list));
+        return list;
     }
 
     public async Task<TeamDetail> GetTeamAsync(int teamId)
