@@ -18,6 +18,8 @@ Action<HttpClient> configureFootballData = client =>
 
 builder.Services.AddHttpClient<IStandingsService, FootballDataStandingsService>(configureFootballData);
 builder.Services.AddHttpClient<ITeamService, FootballDataTeamService>(configureFootballData);
+builder.Services.AddSingleton<IFavouritesRepository>(_ =>
+    new JsonFavouritesRepository(Path.Combine(builder.Environment.ContentRootPath, "Data", "favourites.json")));
 
 var app = builder.Build();
 

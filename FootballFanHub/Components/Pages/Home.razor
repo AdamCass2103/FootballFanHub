@@ -1,33 +1,69 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@inject IFavouritesRepository Favourites
+@inject ITeamService TeamService
 
 <h3>My Favourite Teams</h3>
 
-<div class="row">
-    <div class="col-md-3 mb-3">
-        <div class="card">
-            <div class="card-body text-center">
-                <div style="font-size:3rem"></div>
-                <h6>Aston Villa</h6>
-                <small class="text-muted">Villa Park</small>
-            </div>
-        </div>
+@if (!loaded)
+{
+    <div class="loading-box">Loading…</div>
+}
+else if (teams.Count == 0)
+{
+    <div class="alert alert-info">
+        You aren't following any teams yet. <a href="/search">Search for a club</a> and press Follow.
     </div>
-    <div class="col-md-3 mb-3">
-        <div class="card">
-            <div class="card-body text-center">
-                <div style="font-size:3rem"></div>
-                <h6>Liverpool</h6>
-                <small class="text-muted">Anfield</small>
+}
+else
+{
+    <div class="row">
+        @foreach (var t in teams)
+        {
+            <div class="col-md-4 mb-3">
+                <a href="/team/@t.Id" class="text-decoration-none text-reset">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <img src="@t.CrestUrl" alt="" style="height:64px" />
+                            <h6 class="mt-2">@t.Name</h6>
+                            <small class="text-muted">@t.Venue</small>
+                            <div class="mt-2 small">@NextMatchText(t.Id)</div>
+                        </div>
+                    </div>
+                </a>
             </div>
-        </div>
+        }
     </div>
-    <div class="col-md-3 mb-3">
-        <div class="card">
-            <div class="card-body text-center">
-                <div style="font-size:3rem"></div>
-                <h6>Chelsea</h6>
-                <small class="text-muted">Stamford Bridge</small>
-            </div>
-        </div>
-    </div>
-</div>
+}
+
+@code {
+    private List<FavouriteTeam> teams = new();
+    private readonly Dictionary<int, string> nextMatch = new();
+    private bool loaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        teams = await Favourites.GetAllAsync();
+        loaded = true;   // show the cards straight away, fixtures fill in after
+
+        foreach (var t in teams)
+        {
+            try
+            {
+                var upcoming = await TeamService.GetUpcomingMatchesAsync(t.Id);
+                var next = upcoming.FirstOrDefault();
+                nextMatch[t.Id] = next == null
+                    ? "No fixtures scheduled"
+                    : $"Next: {next.HomeTeamName} v {next.AwayTeamName}, {next.UtcDate.ToLocalTime().ToString("ddd d MMM, HH:mm")}";
+            }
+            catch (ApiException)
+            {
+                nextMatch[t.Id] = "Fixtures unavailable right now";
+            }
+            StateHasChanged();   // update each card as its fixture arrives
+        }
+    }
+
+    private string NextMatchText(int id) =>
+        nextMatch.TryGetValue(id, out var text) ? text : "Loading fixtures…";
+}

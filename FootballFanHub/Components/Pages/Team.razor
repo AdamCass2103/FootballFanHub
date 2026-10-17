@@ -1,6 +1,7 @@
 ﻿@page "/team/{Id:int}"
 @rendermode InteractiveServer
 @inject ITeamService TeamService
+@inject IFavouritesRepository Favourites
 
 <a href="/search" class="d-inline-block mb-3">← Back to search</a>
 
@@ -23,6 +24,10 @@ else
             {
                 <div class="text-muted">Manager: @team.Coach</div>
             }
+            <button class="btn @(isFavourite ? "btn-outline-secondary" : "btn-success") btn-sm mt-2"
+                    @onclick="ToggleFollowAsync">
+                @(isFavourite ? "Unfollow" : "★ Follow")
+            </button>
         </div>
     </div>
 
@@ -114,6 +119,8 @@ else
     private List<MatchSummary> recent = new();
     private List<char> form = new();
     private string? error;
+    private bool isFavourite;
+    private bool isToggling;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -125,10 +132,57 @@ else
             upcoming = await TeamService.GetUpcomingMatchesAsync(Id);
             recent = await TeamService.GetRecentResultsAsync(Id);
             form = FormCalculator.GetForm(recent, Id);
+            // load favourite state for this team
+            isFavourite = await Favourites.IsFavouriteAsync(Id);
         }
         catch (ApiException ex)
         {
             error = ex.Message;
+        }
+    }
+
+    private async Task ToggleFollowAsync()
+    {
+        if (isToggling) return;
+        isToggling = true;
+        error = null;
+        try
+        {
+            if (isFavourite)
+            {
+                var removed = await Favourites.RemoveAsync(Id);
+                if (removed) isFavourite = false;
+                else error = "Couldn't unfollow the team.";
+            }
+            else
+            {
+                if (team is null)
+                {
+                    error = "Team not loaded.";
+                    return;
+                }
+
+                var fav = new FootballFanHub.Models.FavouriteTeam
+                {
+                    Id = team.Id,
+                    Name = team.Name,
+                    CrestUrl = team.CrestUrl,
+                    Venue = team.Venue
+                };
+
+                var added = await Favourites.AddAsync(fav);
+                if (added) isFavourite = true;
+                else error = "Team is already followed.";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isToggling = false;
+            StateHasChanged();
         }
     }
 
