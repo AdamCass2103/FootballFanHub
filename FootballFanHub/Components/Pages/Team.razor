@@ -1,5 +1,161 @@
-﻿<h3>Team</h3>
+﻿@page "/team/{Id:int}"
+@rendermode InteractiveServer
+@inject ITeamService TeamService
+
+<a href="/search" class="d-inline-block mb-3">← Back to search</a>
+
+@if (error != null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (team == null)
+{
+    <div class="loading-box">Loading team…</div>
+}
+else
+{
+    <div class="d-flex align-items-center mb-4">
+        <img src="@team.CrestUrl" alt="" style="height:80px" class="me-3" />
+        <div>
+            <h3 class="mb-1">@team.Name</h3>
+            <div class="text-muted">@Subtitle()</div>
+            @if (team.Coach != "")
+            {
+                <div class="text-muted">Manager: @team.Coach</div>
+            }
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <strong>Form:</strong>
+        @foreach (var r in form)
+        {
+            <span class="badge @BadgeClass(r) me-1">@r</span>
+        }
+        @if (form.Count == 0)
+        {
+            <span class="text-muted">No recent results</span>
+        }
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <h5>Upcoming fixtures</h5>
+            @if (upcoming.Count == 0)
+            {
+                <p class="text-muted">None scheduled.</p>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var m in upcoming)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>@m.HomeTeamName v @m.AwayTeamName</span>
+                            <small class="text-muted">@m.UtcDate.ToLocalTime().ToString("ddd d MMM, HH:mm")</small>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <h5>Recent results</h5>
+            @if (recent.Count == 0)
+            {
+                <p class="text-muted">No recent results.</p>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var m in recent)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>@m.HomeTeamName <strong>@m.HomeGoals - @m.AwayGoals</strong> @m.AwayTeamName</span>
+                            <small class="text-muted">@m.UtcDate.ToLocalTime().ToString("d MMM")</small>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+    <h5>Squad</h5>
+    @if (team.Squad.Count == 0)
+    {
+        <p class="text-muted">Squad not available.</p>
+    }
+    else
+    {
+        <table class="table standings-table">
+            <thead>
+                <tr><th>Name</th><th>Position</th><th>Nationality</th><th>Age</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var p in team.Squad.OrderBy(p => PositionOrder(p.Position)).ThenBy(p => p.Name))
+                {
+                    <tr>
+                        <td>@p.Name</td>
+                        <td>@p.Position</td>
+                        <td>@p.Nationality</td>
+                        <td>@p.Age</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
 
 @code {
+    [Parameter] public int Id { get; set; }
 
+    private TeamDetail? team;
+    private List<MatchSummary> upcoming = new();
+    private List<MatchSummary> recent = new();
+    private List<char> form = new();
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        team = null;
+        error = null;
+        try
+        {
+            team = await TeamService.GetTeamAsync(Id);
+            upcoming = await TeamService.GetUpcomingMatchesAsync(Id);
+            recent = await TeamService.GetRecentResultsAsync(Id);
+            form = FormCalculator.GetForm(recent, Id);
+        }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private string Subtitle()
+    {
+        var parts = new List<string>();
+        if (team!.Venue != "") parts.Add(team.Venue);
+        if (team.Founded != null) parts.Add($"Founded {team.Founded}");
+        if (team.ClubColours != "") parts.Add(team.ClubColours);
+        return string.Join(" · ", parts);
+    }
+
+    private static string BadgeClass(char result) => result switch
+    {
+        'W' => "bg-success",
+        'D' => "bg-secondary",
+        'L' => "bg-danger",
+        _ => "bg-light text-dark"
+    };
+
+    // Goalkeepers first, then defenders, midfielders, attackers
+    private static int PositionOrder(string position)
+    {
+        if (position.Contains("keeper", StringComparison.OrdinalIgnoreCase)) return 0;
+        if (position.Contains("back", StringComparison.OrdinalIgnoreCase)
+            || position.Contains("defen", StringComparison.OrdinalIgnoreCase)) return 1;
+        if (position.Contains("midfield", StringComparison.OrdinalIgnoreCase)) return 2;
+        return 3;
+    }
 }
