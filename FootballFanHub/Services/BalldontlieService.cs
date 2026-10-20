@@ -1,7 +1,7 @@
 ﻿using System.Net.Http.Json;
 using System.Text.Json;
 
-namespace YourProjectName.Services;
+namespace FootballFanHub.Services;
 
 public interface IBalldontlieService
 {
@@ -24,7 +24,7 @@ public class BalldontlieService : IBalldontlieService
     {
         // Note: base URL for balldontlie is https://api.balldontlie.io
         var request = new HttpRequestMessage(HttpMethod.Get, "https://api.balldontlie.io/nba/v1/teams");
-        request.Headers.Add("Authorization", $"Bearer {_apiKey}");
+        request.Headers.Add("Authorization", _apiKey);
 
         var response = await _http.SendAsync(request);
 

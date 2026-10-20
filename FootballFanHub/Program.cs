@@ -1,6 +1,5 @@
 using FootballFanHub.Components;
 using FootballFanHub.Services;
-using YourProjectName.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
