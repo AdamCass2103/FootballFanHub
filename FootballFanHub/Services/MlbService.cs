@@ -5,6 +5,8 @@ namespace FootballFanHub.Services;
 
 public interface IMlbService
 {
+    Task<List<MlbTeam>> GetTeamsAsync(int season);
+    Task<List<MlbRosterPlayer>> GetRosterAsync(string teamId);
     Task<List<MlbPlayer>> SearchPlayersAsync(string name);
     Task<MlbPlayer?> GetPlayerAsync(string playerId);
     Task<List<MlbPlayerTeam>> GetPlayerTeamsAsync(string playerId, int? season = null);
@@ -22,6 +24,16 @@ public sealed class MlbService : IMlbService
         _http = http;
         _http.Timeout = TimeSpan.FromSeconds(15);
     }
+
+    public Task<List<MlbTeam>> GetTeamsAsync(int season) =>
+        GetRowsAsync<MlbTeam>(
+            $"team_all_season.bam?sport_code='mlb'&all_star_sw='N'&sort_order=name_asc&season='{season}'",
+            "team_all_season");
+
+    public Task<List<MlbRosterPlayer>> GetRosterAsync(string teamId) =>
+        GetRowsAsync<MlbRosterPlayer>(
+            $"roster_40.bam?team_id='{Uri.EscapeDataString(teamId)}'",
+            "roster_40");
 
     public Task<List<MlbPlayer>> SearchPlayersAsync(string name)
     {
@@ -99,6 +111,41 @@ public sealed class MlbService : IMlbService
     {
         PropertyNameCaseInsensitive = true
     };
+}
+
+public class MlbTeam
+{
+    public string Mlb_Org_Id { get; set; } = "";
+    public string Franchise_Code { get; set; } = "";
+    public string Name_Display_Full { get; set; } = "";
+    public string Name_Display_Short { get; set; } = "";
+    public string City { get; set; } = "";
+    public string Address_City { get; set; } = "";
+    public string Venue_Name { get; set; } = "";
+    public string Venue_Id { get; set; } = "";
+    public string League { get; set; } = "";
+    public string League_Abbrev { get; set; } = "";
+    public string Division { get; set; } = "";
+    public string Phone_Number { get; set; } = "";
+}
+
+public class MlbRosterPlayer
+{
+    public string Player_Id { get; set; } = "";
+    public string Name_Display_First_Last { get; set; } = "";
+    public string Name_First { get; set; } = "";
+    public string Name_Last { get; set; } = "";
+    public string Position_Txt { get; set; } = "";
+    public string Primary_Position { get; set; } = "";
+    public string Jersey_Number { get; set; } = "";
+    public string Bats { get; set; } = "";
+    public string Throws { get; set; } = "";
+    public string Birth_Date { get; set; } = "";
+
+    [JsonIgnore]
+    public string DisplayName => string.IsNullOrWhiteSpace(Name_Display_First_Last)
+        ? $"{Name_First} {Name_Last}".Trim()
+        : Name_Display_First_Last;
 }
 
 public class MlbPlayer

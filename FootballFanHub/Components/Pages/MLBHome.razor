@@ -15,15 +15,48 @@
     </div>
 </div>
 
+<div class="d-flex gap-2 align-items-center mb-3">
+    <h5 class="mb-0">MLB teams</h5>
+    <label for="teamSeason">Season</label>
+    <input id="teamSeason" class="form-control" style="max-width:110px" type="number"
+           min="1900" max="@DateTime.UtcNow.Year" @bind="teamSeason" @bind:after="LoadTeamsAsync" />
+</div>
+
+@if (teamErrorMessage != null)
+{
+    <div class="alert alert-warning">Could not load MLB teams: @teamErrorMessage</div>
+}
+else if (teams.Count == 0)
+{
+    <p class="text-muted">No MLB teams were returned for the selected season.</p>
+}
+else
+{
+    <div class="row mb-4">
+        @foreach (var team in teams)
+        {
+            <div class="col-md-4 col-lg-3 mb-3">
+                <a class="card h-100 text-decoration-none text-reset" href="/mlb/team/@team.Mlb_Org_Id?season=@teamSeason">
+                    <div class="card-body">
+                        <h6>@team.Name_Display_Full</h6>
+                        <div class="text-muted">@team.City · @team.Franchise_Code</div>
+                        <small class="text-muted">@team.Venue_Name</small>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}
+
 <div class="input-group mb-3" style="max-width:520px">
     <input class="form-control" placeholder="Search for an MLB player…"
            @bind="query" @bind:event="oninput" @onkeydown="HandleKeyDownAsync" />
     <button class="btn btn-primary" @onclick="SearchAsync" disabled="@isLoading">Search</button>
 </div>
 
-@if (errorMessage != null)
+@if (playerErrorMessage != null)
 {
-    <div class="alert alert-danger">@errorMessage</div>
+    <div class="alert alert-danger">@playerErrorMessage</div>
 }
 else if (isLoading)
 {
@@ -57,10 +90,13 @@ else
 
 @code {
     private string query = "";
+    private int teamSeason = DateTime.UtcNow.Year - 1;
+    private List<MlbTeam> teams = new();
     private List<MlbPlayer> players = new();
     private bool isLoading;
+    private string? teamErrorMessage;
+    private string? playerErrorMessage;
     private bool hasSearched;
-    private string? errorMessage;
 
     private async Task HandleKeyDownAsync(KeyboardEventArgs args)
     {
@@ -76,13 +112,13 @@ else
         {
             players = new();
             hasSearched = false;
-            errorMessage = null;
+            playerErrorMessage = null;
             return;
         }
 
         isLoading = true;
         hasSearched = true;
-        errorMessage = null;
+        playerErrorMessage = null;
         try
         {
             players = await MlbService.SearchPlayersAsync(query);
@@ -90,11 +126,30 @@ else
         catch (Exception ex)
         {
             players = new();
-            errorMessage = $"Failed to search MLB players: {ex.Message}";
+            playerErrorMessage = $"Failed to search MLB players: {ex.Message}";
         }
         finally
         {
             isLoading = false;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTeamsAsync();
+    }
+
+    private async Task LoadTeamsAsync()
+    {
+        teamErrorMessage = null;
+        try
+        {
+            teams = await MlbService.GetTeamsAsync(teamSeason);
+        }
+        catch (Exception ex)
+        {
+            teams = new();
+            teamErrorMessage = ex.Message;
         }
     }
 

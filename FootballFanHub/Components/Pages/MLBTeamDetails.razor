@@ -1,0 +1,125 @@
+@page "/mlb/team/{TeamId}"
+@rendermode InteractiveServer
+@inject IMlbService MlbService
+
+<a href="/mlb" class="d-inline-block mb-3">← Back to MLB</a>
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (isLoading)
+{
+    <div class="loading-box">Loading MLB team…</div>
+}
+else if (team == null)
+{
+    <div class="alert alert-warning">MLB team not found for the selected season.</div>
+}
+else
+{
+    <div class="d-flex align-items-center mb-4">
+        <div>
+            <h3 class="mb-1">@team.Name_Display_Full</h3>
+            <div class="text-muted">@team.City · @team.Franchise_Code</div>
+            <div class="text-muted">@team.League @team.Division</div>
+            @if (!string.IsNullOrWhiteSpace(team.Venue_Name))
+            {
+                <div class="text-muted">Venue: @team.Venue_Name</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(team.Phone_Number))
+            {
+                <div class="text-muted">Phone: @team.Phone_Number</div>
+            }
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 align-items-center mb-3">
+        <label for="season">Season</label>
+        <input id="season" class="form-control" style="max-width:110px" type="number"
+               min="1900" max="@DateTime.UtcNow.Year" @bind="season" @bind:after="LoadAsync" />
+    </div>
+
+    <h5>40-man roster</h5>
+    @if (roster.Count == 0)
+    {
+        <p class="text-muted">No roster data is available for this team.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table standings-table">
+                <thead>
+                    <tr><th>Player</th><th>Position</th><th>Jersey</th><th>Bats</th><th>Throws</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var player in roster.OrderBy(x => x.Position_Txt).ThenBy(x => x.DisplayName))
+                    {
+                        <tr>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(player.Player_Id))
+                                {
+                                    <a href="/mlb/player/@player.Player_Id">@player.DisplayName</a>
+                                }
+                                else
+                                {
+                                    @player.DisplayName
+                                }
+                            </td>
+                            <td>@player.Position_Txt</td>
+                            <td>@player.Jersey_Number</td>
+                            <td>@player.Bats</td>
+                            <td>@player.Throws</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public string TeamId { get; set; } = "";
+    [SupplyParameterFromQuery] public int? Season { get; set; }
+
+    private MlbTeam? team;
+    private List<MlbRosterPlayer> roster = new();
+    private int season = DateTime.UtcNow.Year - 1;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Season.HasValue)
+        {
+            season = Season.Value;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            var teamsTask = MlbService.GetTeamsAsync(season);
+            var rosterTask = MlbService.GetRosterAsync(TeamId);
+            await Task.WhenAll(teamsTask, rosterTask);
+
+            team = (await teamsTask).FirstOrDefault(x => x.Mlb_Org_Id == TeamId);
+            roster = await rosterTask;
+        }
+        catch (Exception ex)
+        {
+            team = null;
+            roster = new();
+            errorMessage = $"Failed to load MLB team data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
