@@ -1,0 +1,103 @@
+@page "/mlb"
+@rendermode InteractiveServer
+@inject IMlbService MlbService
+
+<h3>MLB Centre</h3>
+
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5>Search MLB players</h5>
+                <p class="text-muted mb-0">Find active players and view their profile and season statistics.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="input-group mb-3" style="max-width:520px">
+    <input class="form-control" placeholder="Search for an MLB player…"
+           @bind="query" @bind:event="oninput" @onkeydown="HandleKeyDownAsync" />
+    <button class="btn btn-primary" @onclick="SearchAsync" disabled="@isLoading">Search</button>
+</div>
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (isLoading)
+{
+    <div class="loading-box">Searching MLB players…</div>
+}
+else if (hasSearched && players.Count == 0)
+{
+    <p class="text-muted">No active MLB players matched "@query".</p>
+}
+else if (!hasSearched)
+{
+    <p class="text-muted">Search for a player to get started.</p>
+}
+else
+{
+    <div class="row">
+        @foreach (var player in players)
+        {
+            <div class="col-md-4 mb-3">
+                <a class="card h-100 text-decoration-none text-reset" href="/mlb/player/@player.Player_Id">
+                    <div class="card-body">
+                        <h6>@player.DisplayName</h6>
+                        <div class="text-muted">@player.Team_Full</div>
+                        <small class="text-muted">@GetPosition(player)</small>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private string query = "";
+    private List<MlbPlayer> players = new();
+    private bool isLoading;
+    private bool hasSearched;
+    private string? errorMessage;
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await SearchAsync();
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            players = new();
+            hasSearched = false;
+            errorMessage = null;
+            return;
+        }
+
+        isLoading = true;
+        hasSearched = true;
+        errorMessage = null;
+        try
+        {
+            players = await MlbService.SearchPlayersAsync(query);
+        }
+        catch (Exception ex)
+        {
+            players = new();
+            errorMessage = $"Failed to search MLB players: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string GetPosition(MlbPlayer player) =>
+        string.IsNullOrWhiteSpace(player.Primary_Position_Txt) ? player.Position : player.Primary_Position_Txt;
+}

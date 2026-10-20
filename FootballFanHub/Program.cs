@@ -14,6 +14,7 @@ builder.Services.AddScoped(sp => new HttpClient());
 
 // Register our service
 builder.Services.AddScoped<IBalldontlieService, BalldontlieService>();
+builder.Services.AddHttpClient<IMlbService, MlbService>();
 
 Action<HttpClient> configureFootballData = client =>
 {

@@ -1,0 +1,174 @@
+@page "/mlb/player/{PlayerId}"
+@rendermode InteractiveServer
+@inject IMlbService MlbService
+
+<a href="/mlb" class="d-inline-block mb-3">← Back to MLB search</a>
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (isLoading)
+{
+    <div class="loading-box">Loading MLB player…</div>
+}
+else if (player == null)
+{
+    <div class="alert alert-warning">MLB player not found.</div>
+}
+else
+{
+    <div class="d-flex align-items-center mb-4">
+        <div>
+            <h3 class="mb-1">@player.DisplayName</h3>
+            <div class="text-muted">@player.Team_Full · @GetPosition()</div>
+            <div class="text-muted">Bats: @player.Bats · Throws: @player.Throws</div>
+            @if (!string.IsNullOrWhiteSpace(player.Birth_Date))
+            {
+                <div class="text-muted">Born: @player.Birth_Date in @player.Birth_Country</div>
+            }
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 align-items-center mb-3">
+        <label for="season">Season</label>
+        <input id="season" class="form-control" style="max-width:110px" type="number"
+               min="1900" max="@DateTime.UtcNow.Year" @bind="season" @bind:after="LoadStatsAsync" />
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <h5>Season hitting statistics</h5>
+            @if (hittingStats == null)
+            {
+                <p class="text-muted">No hitting statistics available for @season.</p>
+            }
+            else
+            {
+                <table class="table standings-table">
+                    <tbody>
+                        <tr><th>Team</th><td>@hittingStats.Team_Full</td></tr>
+                        <tr><th>Games</th><td>@hittingStats.G</td></tr>
+                        <tr><th>At bats</th><td>@hittingStats.AB</td></tr>
+                        <tr><th>Hits</th><td>@hittingStats.H</td></tr>
+                        <tr><th>Home runs</th><td>@hittingStats.HR</td></tr>
+                        <tr><th>RBI</th><td>@hittingStats.RBI</td></tr>
+                        <tr><th>AVG</th><td>@hittingStats.AVG</td></tr>
+                        <tr><th>OBP</th><td>@hittingStats.OBP</td></tr>
+                        <tr><th>SLG</th><td>@hittingStats.SLG</td></tr>
+                        <tr><th>OPS</th><td>@hittingStats.OPS</td></tr>
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <h5>Season pitching statistics</h5>
+            @if (pitchingStats == null)
+            {
+                <p class="text-muted">No pitching statistics available for @season.</p>
+            }
+            else
+            {
+                <table class="table standings-table">
+                    <tbody>
+                        <tr><th>Team</th><td>@pitchingStats.Team_Full</td></tr>
+                        <tr><th>Games</th><td>@pitchingStats.G</td></tr>
+                        <tr><th>Wins</th><td>@pitchingStats.W</td></tr>
+                        <tr><th>Losses</th><td>@pitchingStats.L</td></tr>
+                        <tr><th>ERA</th><td>@pitchingStats.ERA</td></tr>
+                        <tr><th>Innings pitched</th><td>@pitchingStats.IP</td></tr>
+                        <tr><th>Strikeouts</th><td>@pitchingStats.SO</td></tr>
+                        <tr><th>WHIP</th><td>@pitchingStats.WHIP</td></tr>
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+
+    <h5>Teams played for</h5>
+    @if (teams.Count == 0)
+    {
+        <p class="text-muted">No team history available.</p>
+    }
+    else
+    {
+        <table class="table standings-table">
+            <thead><tr><th>Season</th><th>Team</th><th>League</th><th>Status</th></tr></thead>
+            <tbody>
+                @foreach (var team in teams)
+                {
+                    <tr>
+                        <td>@team.Season</td>
+                        <td>@team.Org_Full</td>
+                        <td>@team.League_Full</td>
+                        <td>@team.Status</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    [Parameter] public string PlayerId { get; set; } = "";
+
+    private MlbPlayer? player;
+    private List<MlbPlayerTeam> teams = new();
+    private MlbHittingStats? hittingStats;
+    private MlbPitchingStats? pitchingStats;
+    private int season = DateTime.UtcNow.Year - 1;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPlayerAsync();
+    }
+
+    private async Task LoadPlayerAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            player = await MlbService.GetPlayerAsync(PlayerId);
+            if (player == null)
+            {
+                return;
+            }
+
+            teams = await MlbService.GetPlayerTeamsAsync(PlayerId);
+            await LoadStatsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load MLB player data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadStatsAsync()
+    {
+        try
+        {
+            var hittingTask = MlbService.GetHittingStatsAsync(PlayerId, season);
+            var pitchingTask = MlbService.GetPitchingStatsAsync(PlayerId, season);
+            await Task.WhenAll(hittingTask, pitchingTask);
+            hittingStats = await hittingTask;
+            pitchingStats = await pitchingTask;
+        }
+        catch (Exception ex)
+        {
+            hittingStats = null;
+            pitchingStats = null;
+            errorMessage = $"Failed to load MLB statistics: {ex.Message}";
+        }
+    }
+
+    private string GetPosition() =>
+        string.IsNullOrWhiteSpace(player?.Primary_Position_Txt) ? player?.Position ?? "" : player.Primary_Position_Txt;
+}
