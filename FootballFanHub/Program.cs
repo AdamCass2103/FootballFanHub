@@ -1,5 +1,6 @@
 using FootballFanHub.Components;
 using FootballFanHub.Services;
+using YourProjectName.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +9,12 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddMemoryCache();
+
+// Register HttpClient (if not already registered in the template, add it)
+builder.Services.AddScoped(sp => new HttpClient());
+
+// Register our service
+builder.Services.AddScoped<IBalldontlieService, BalldontlieService>();
 
 Action<HttpClient> configureFootballData = client =>
 {
