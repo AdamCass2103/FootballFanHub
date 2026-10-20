@@ -1,0 +1,46 @@
+﻿@page "/nbateams"
+@using YourProjectName.Services
+@inject IBalldontlieService BalldontlieService
+
+<h3>NBA Teams</h3>
+
+@if (isLoading)
+{
+    <p>Loading...</p>
+}
+else if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else
+{
+    <ul>
+        @foreach (var team in teams)
+        {
+            <li>@team.Full_Name (@team.Abbreviation)</li>
+        }
+    </ul>
+}
+
+@code {
+    private List<NBATeam> teams = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            teams = await BalldontlieService.GetTeamsAsync();
+        }
+        catch (Exception ex)
+        {
+            // This is the error handling for your assignment
+            errorMessage = $"Failed to load data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
