@@ -1,0 +1,71 @@
+@page "/nba/search"
+@rendermode InteractiveServer
+@inject IBalldontlieService BalldontlieService
+
+<h3>Search NBA Teams</h3>
+
+<input class="form-control mb-3" style="max-width:360px" placeholder="Search for an NBA team…"
+       @bind="query" @bind:event="oninput" />
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (isLoading)
+{
+    <div class="loading-box">Loading NBA teams…</div>
+}
+else if (string.IsNullOrWhiteSpace(query))
+{
+    <p class="text-muted">Type a team name, city, or abbreviation to search.</p>
+}
+else if (Results.Count == 0)
+{
+    <p class="text-muted">No NBA teams match "@query".</p>
+}
+else
+{
+    <div class="row">
+        @foreach (var team in Results)
+        {
+            <div class="col-md-4 col-lg-3 mb-3">
+                <a class="card h-100 text-decoration-none text-reset" href="/nba/team/@team.Id">
+                    <div class="card-body">
+                        <img src="@team.LogoUrl" alt="@team.Full_Name logo" style="height:64px" class="mb-2" />
+                        <h6>@team.Full_Name</h6>
+                        <small class="text-muted">@team.Abbreviation · @team.City</small>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<NBATeam> allTeams = new();
+    private string query = "";
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    private List<NBATeam> Results => allTeams
+        .Where(team => team.Full_Name.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)
+                    || team.City.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)
+                    || team.Abbreviation.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            allTeams = await BalldontlieService.GetTeamsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load NBA teams: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

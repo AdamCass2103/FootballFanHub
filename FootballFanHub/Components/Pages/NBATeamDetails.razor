@@ -1,0 +1,189 @@
+@page "/nba/team/{Id:int}"
+@rendermode InteractiveServer
+@inject IBalldontlieService BalldontlieService
+
+<a href="/nba/search" class="d-inline-block mb-3">← Back to NBA search</a>
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (isLoading)
+{
+    <div class="loading-box">Loading team statistics…</div>
+}
+else if (team == null)
+{
+    <div class="alert alert-warning">NBA team not found.</div>
+}
+else
+{
+    <div class="d-flex align-items-center mb-4">
+        <img src="@team.LogoUrl" alt="@team.Full_Name logo" style="height:96px" class="me-3" />
+        <div>
+            <h3 class="mb-1">@team.Full_Name</h3>
+            <div class="text-muted">@team.City · @team.Abbreviation</div>
+            <div class="text-muted">@team.Conference Conference · @team.Division Division</div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 align-items-center mb-3">
+        <label for="season">Season</label>
+        <input id="season" class="form-control" style="max-width:110px" type="number"
+               min="1946" max="@DateTime.UtcNow.Year" @bind="season" @bind:after="LoadTeamDataAsync" />
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="card h-100"><div class="card-body">
+                <h6>Season record</h6>
+                <strong class="fs-4">@wins - @losses</strong>
+            </div></div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100"><div class="card-body">
+                <h6>Games played</h6>
+                <strong class="fs-4">@completedGames.Count()</strong>
+            </div></div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100"><div class="card-body">
+                <h6>Player stat records</h6>
+                <strong class="fs-4">@playerStats.Count</strong>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <h5>Games</h5>
+            @if (games.Count == 0)
+            {
+                <p class="text-muted">No games available for this season.</p>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var game in games.OrderByDescending(x => x.Date).Take(10))
+                    {
+                        var isHome = game.Home_Team.Id == Id;
+                        var opponent = isHome ? game.Visitor_Team.Full_Name : game.Home_Team.Full_Name;
+                        var teamScore = isHome ? game.Home_Team_Score : game.Visitor_Team_Score;
+                        var opponentScore = isHome ? game.Visitor_Team_Score : game.Home_Team_Score;
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>@(isHome ? "vs" : "at") @opponent</span>
+                            <span>
+                                @if (game.Date < DateTime.UtcNow && (teamScore != 0 || opponentScore != 0))
+                                {
+                                    <strong>@teamScore - @opponentScore</strong>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Scheduled</span>
+                                }
+                                <small class="text-muted ms-2">@game.Date.ToLocalTime().ToString("d MMM")</small>
+                            </span>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <h5>Player statistics</h5>
+            @if (playerAverages.Count == 0)
+            {
+                <p class="text-muted">Player statistics are not available for this season.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table standings-table">
+                        <thead><tr><th>Player</th><th>GP</th><th>PTS</th><th>REB</th><th>AST</th></tr></thead>
+                        <tbody>
+                            @foreach (var player in playerAverages.OrderByDescending(x => x.Points))
+                            {
+                                <tr>
+                                    <td>@player.Name</td>
+                                    <td>@player.Games</td>
+                                    <td>@player.Points.ToString("0.0")</td>
+                                    <td>@player.Rebounds.ToString("0.0")</td>
+                                    <td>@player.Assists.ToString("0.0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private NBATeam? team;
+    private List<NBAGame> games = new();
+    private List<NBAPlayerStat> playerStats = new();
+    private List<PlayerAverage> playerAverages = new();
+    private int season = DateTime.UtcNow.Year - 1;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    private IEnumerable<NBAGame> completedGames => games.Where(game =>
+        game.Date < DateTime.UtcNow &&
+        (game.Home_Team_Score != 0 || game.Visitor_Team_Score != 0));
+
+    private int wins => completedGames.Count(game =>
+        (game.Home_Team.Id == Id && game.Home_Team_Score > game.Visitor_Team_Score) ||
+        (game.Visitor_Team.Id == Id && game.Visitor_Team_Score > game.Home_Team_Score));
+
+    private int losses => completedGames.Count() - wins;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTeamDataAsync();
+    }
+
+    private async Task LoadTeamDataAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            team = await BalldontlieService.GetTeamAsync(Id);
+            if (team is null)
+            {
+                return;
+            }
+
+            var gamesTask = BalldontlieService.GetGamesAsync(Id, season);
+            var statsTask = BalldontlieService.GetPlayerStatsAsync(Id, season);
+            await Task.WhenAll(gamesTask, statsTask);
+            games = await gamesTask;
+            playerStats = await statsTask;
+            playerAverages = playerStats
+                .GroupBy(stat => stat.Player.Id)
+                .Select(group => new PlayerAverage(
+                    group.First().Player.FullName,
+                    group.Count(),
+                    group.Average(stat => stat.Pts),
+                    group.Average(stat => stat.Reb),
+                    group.Average(stat => stat.Ast)))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            games = new();
+            playerStats = new();
+            playerAverages = new();
+            errorMessage = $"Failed to load NBA team statistics: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private sealed record PlayerAverage(string Name, int Games, double Points, double Rebounds, double Assists);
+}
