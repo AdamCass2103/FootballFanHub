@@ -9,7 +9,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddMemoryCache();
 
-// Register HttpClient (if not already registered in the template, add it)
+// Register HttpClient 
 builder.Services.AddScoped(sp => new HttpClient());
 
 // Register our service

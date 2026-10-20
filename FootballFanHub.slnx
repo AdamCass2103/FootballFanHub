@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+  </Folder>
   <Project Path="FootballFanHub.Tests/FootballFanHub.Tests.csproj" />
   <Project Path="FootballFanHub/FootballFanHub.csproj" />
 </Solution>
