@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace FootballFanHub.Services;
 
@@ -7,59 +8,71 @@ public interface IBalldontlieService
 {
     Task<List<NBATeam>> GetTeamsAsync();
     Task<NBATeam?> GetTeamAsync(int teamId);
-    Task<List<NBAStanding>> GetStandingsAsync(int season);
     Task<List<NBAGame>> GetGamesAsync(int teamId, int season);
-    Task<List<NBAPlayerStat>> GetPlayerStatsAsync(int teamId, int season);
+    Task<List<NBARosterPlayer>> GetPlayersAsync(int teamId);
 }
 
 public class BalldontlieService : IBalldontlieService
 {
     private readonly HttpClient _http;
+    private readonly IMemoryCache _cache;
     private readonly string _apiKey;
 
-    public BalldontlieService(HttpClient http, IConfiguration config)
+    public BalldontlieService(HttpClient http, IMemoryCache cache, IConfiguration config)
     {
         _http = http;
+        _cache = cache;
         // Read key from configuration, never hardcode
         _apiKey = config["Balldontlie:ApiKey"] ?? throw new InvalidOperationException("API Key not configured");
     }
 
+    // The team list rarely changes, so keep it for a day
     public async Task<List<NBATeam>> GetTeamsAsync()
     {
-        return await GetAsync<NBATeam>("teams");
+        return await GetAsync<NBATeam>("teams", TimeSpan.FromHours(24));
     }
 
+    // Uses the cached team list, so this no longer costs an extra API call
     public async Task<NBATeam?> GetTeamAsync(int teamId)
     {
         return (await GetTeamsAsync()).FirstOrDefault(team => team.Id == teamId);
     }
 
-    public async Task<List<NBAStanding>> GetStandingsAsync(int season)
-    {
-        return await GetAsync<NBAStanding>($"standings?season={season}");
-    }
-
     public async Task<List<NBAGame>> GetGamesAsync(int teamId, int season)
     {
-        return await GetAsync<NBAGame>($"games?team_ids[]={teamId}&seasons[]={season}&per_page=100");
+        return await GetAsync<NBAGame>(
+            $"games?team_ids[]={teamId}&seasons[]={season}&per_page=100", TimeSpan.FromMinutes(10));
     }
 
-    public async Task<List<NBAPlayerStat>> GetPlayerStatsAsync(int teamId, int season)
+    // Free-tier endpoint: gives a team roster instead of the paid player-stats data
+    public async Task<List<NBARosterPlayer>> GetPlayersAsync(int teamId)
     {
-        return await GetAsync<NBAPlayerStat>($"stats?team_ids[]={teamId}&seasons[]={season}&per_page=100");
+        return await GetAsync<NBARosterPlayer>(
+            $"players?team_ids[]={teamId}&per_page=100", TimeSpan.FromHours(6));
     }
 
-    private async Task<List<T>> GetAsync<T>(string endpoint)
+    private async Task<List<T>> GetAsync<T>(string endpoint, TimeSpan cacheFor)
     {
+        // Same endpoint + same type = same cache entry, so repeat visits skip the API
+        var cacheKey = $"nba:{typeof(T).Name}:{endpoint}";
+        if (_cache.TryGetValue(cacheKey, out List<T>? cached) && cached is not null)
+            return cached;
+
         var request = new HttpRequestMessage(
             HttpMethod.Get,
             $"https://api.balldontlie.io/nba/v1/{endpoint}");
         request.Headers.Add("Authorization", _apiKey);
 
         var response = await _http.SendAsync(request);
+
         if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
         {
             throw new Exception("API rate limit exceeded, please try again later.");
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new Exception("This NBA data isn't available on the free balldontlie plan.");
         }
 
         if (!response.IsSuccessStatusCode)
@@ -69,11 +82,14 @@ public class BalldontlieService : IBalldontlieService
         }
 
         var result = await response.Content.ReadFromJsonAsync<BalldontlieResponse<T>>();
-        return result?.Data ?? new List<T>();
+        var data = result?.Data ?? new List<T>();
+
+        // Only successful responses reach this line, so an error is retried on the next visit
+        _cache.Set(cacheKey, data, cacheFor);
+        return data;
     }
 }
 
-// Data models matching the API JSON structure
 public class BalldontlieResponse<T>
 {
     public List<T> Data { get; set; } = new();
@@ -94,14 +110,6 @@ public class NBATeam
         $"https://a.espncdn.com/i/teamlogos/nba/500/{Abbreviation.ToLowerInvariant()}.png";
 }
 
-public class NBAStanding
-{
-    public NBATeam Team { get; set; } = new();
-    public int Rank { get; set; }
-    public int Wins { get; set; }
-    public int Losses { get; set; }
-}
-
 public class NBAGame
 {
     public int Id { get; set; }
@@ -113,23 +121,17 @@ public class NBAGame
     public string Status { get; set; } = "";
 }
 
-public class NBAPlayerStat
-{
-    public NBAPlayer Player { get; set; } = new();
-    public int Games_Played { get; set; }
-    public double Pts { get; set; }
-    public double Reb { get; set; }
-    public double Ast { get; set; }
-    public double Stl { get; set; }
-    public double Blk { get; set; }
-    public double Fg_Pct { get; set; }
-}
-
-public class NBAPlayer
+public class NBARosterPlayer
 {
     public int Id { get; set; }
     public string First_Name { get; set; } = "";
     public string Last_Name { get; set; } = "";
+    public string? Position { get; set; }
+    public string? Height { get; set; }
+    public string? Weight { get; set; }
+    public string? Jersey_Number { get; set; }
+    public string? College { get; set; }
+    public string? Country { get; set; }
 
     [JsonIgnore]
     public string FullName => $"{First_Name} {Last_Name}".Trim();

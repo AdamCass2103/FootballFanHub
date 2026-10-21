@@ -10,8 +10,7 @@ public interface ITeamService
     Task<List<MatchSummary>> GetRecentResultsAsync(int teamId, int count = 5);
 }
 
-// Pure logic with no API calls, so it's easy to unit test
-// Pure logic with no API calls, so it's easy to unit test
+
 public static class FormCalculator
 {
     // 'W', 'D' or 'L' from this team's point of view, '?' if there's no score

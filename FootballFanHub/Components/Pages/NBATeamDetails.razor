@@ -4,13 +4,13 @@
 
 <a href="/nba/search" class="d-inline-block mb-3">← Back to NBA search</a>
 
-@if (errorMessage != null)
+@if (team == null && errorMessage != null)
 {
     <div class="alert alert-danger">@errorMessage</div>
 }
 else if (isLoading)
 {
-    <div class="loading-box">Loading team statistics…</div>
+    <div class="loading-box">Loading team data…</div>
 }
 else if (team == null)
 {
@@ -48,11 +48,20 @@ else
         </div>
         <div class="col-md-4 mb-3">
             <div class="card h-100"><div class="card-body">
-                <h6>Player stat records</h6>
-                <strong class="fs-4">@playerStats.Count</strong>
+                <h6>Roster size</h6>
+                <strong class="fs-4">@roster.Count</strong>
             </div></div>
         </div>
     </div>
+
+    @if (gamesError != null)
+    {
+        <div class="alert alert-warning">Games could not be loaded: @gamesError</div>
+    }
+    @if (rosterError != null)
+    {
+        <div class="alert alert-warning">Roster could not be loaded: @rosterError</div>
+    }
 
     <div class="row">
         <div class="col-lg-6 mb-4">
@@ -90,25 +99,27 @@ else
         </div>
 
         <div class="col-lg-6 mb-4">
-            <h5>Player statistics</h5>
-            @if (playerAverages.Count == 0)
+            <h5>Roster</h5>
+            @if (roster.Count == 0)
             {
-                <p class="text-muted">Player statistics are not available for this season.</p>
+                <p class="text-muted">No players listed for this team.</p>
             }
             else
             {
                 <div class="table-responsive">
                     <table class="table standings-table">
-                        <thead><tr><th>Player</th><th>GP</th><th>PTS</th><th>REB</th><th>AST</th></tr></thead>
+                        <thead>
+                            <tr><th>Player</th><th>#</th><th>Pos</th><th>Height</th><th>College</th></tr>
+                        </thead>
                         <tbody>
-                            @foreach (var player in playerAverages.OrderByDescending(x => x.Points))
+                            @foreach (var player in roster.OrderBy(p => p.Last_Name))
                             {
                                 <tr>
-                                    <td>@player.Name</td>
-                                    <td>@player.Games</td>
-                                    <td>@player.Points.ToString("0.0")</td>
-                                    <td>@player.Rebounds.ToString("0.0")</td>
-                                    <td>@player.Assists.ToString("0.0")</td>
+                                    <td>@player.FullName</td>
+                                    <td>@player.Jersey_Number</td>
+                                    <td>@player.Position</td>
+                                    <td>@player.Height</td>
+                                    <td>@player.College</td>
                                 </tr>
                             }
                         </tbody>
@@ -124,11 +135,12 @@ else
 
     private NBATeam? team;
     private List<NBAGame> games = new();
-    private List<NBAPlayerStat> playerStats = new();
-    private List<PlayerAverage> playerAverages = new();
+    private List<NBARosterPlayer> roster = new();
     private int season = DateTime.UtcNow.Year - 1;
     private bool isLoading = true;
     private string? errorMessage;
+    private string? gamesError;
+    private string? rosterError;
 
     private IEnumerable<NBAGame> completedGames => games.Where(game =>
         game.Date < DateTime.UtcNow &&
@@ -149,6 +161,9 @@ else
     {
         isLoading = true;
         errorMessage = null;
+        gamesError = null;
+        rosterError = null;
+
         try
         {
             team = await BalldontlieService.GetTeamAsync(Id);
@@ -157,27 +172,14 @@ else
                 return;
             }
 
-            var gamesTask = BalldontlieService.GetGamesAsync(Id, season);
-            var statsTask = BalldontlieService.GetPlayerStatsAsync(Id, season);
-            await Task.WhenAll(gamesTask, statsTask);
-            games = await gamesTask;
-            playerStats = await statsTask;
-            playerAverages = playerStats
-                .GroupBy(stat => stat.Player.Id)
-                .Select(group => new PlayerAverage(
-                    group.First().Player.FullName,
-                    group.Count(),
-                    group.Average(stat => stat.Pts),
-                    group.Average(stat => stat.Reb),
-                    group.Average(stat => stat.Ast)))
-                .ToList();
+            // Load in parallel, but keep failures independent
+            var gamesTask = LoadGamesAsync();
+            var rosterTask = LoadRosterAsync();
+            await Task.WhenAll(gamesTask, rosterTask);
         }
         catch (Exception ex)
         {
-            games = new();
-            playerStats = new();
-            playerAverages = new();
-            errorMessage = $"Failed to load NBA team statistics: {ex.Message}";
+            errorMessage = $"Failed to load NBA team data: {ex.Message}";
         }
         finally
         {
@@ -185,5 +187,29 @@ else
         }
     }
 
-    private sealed record PlayerAverage(string Name, int Games, double Points, double Rebounds, double Assists);
+    private async Task LoadGamesAsync()
+    {
+        try
+        {
+            games = await BalldontlieService.GetGamesAsync(Id, season);
+        }
+        catch (Exception ex)
+        {
+            games = new();
+            gamesError = ex.Message;
+        }
+    }
+
+    private async Task LoadRosterAsync()
+    {
+        try
+        {
+            roster = await BalldontlieService.GetPlayersAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            roster = new();
+            rosterError = ex.Message;
+        }
+    }
 }
