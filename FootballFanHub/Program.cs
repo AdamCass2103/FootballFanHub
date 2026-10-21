@@ -1,6 +1,7 @@
 using FootballFanHub.Components;
 using FootballFanHub.Services;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -9,11 +10,14 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddMemoryCache();
 
-// Register HttpClient 
+// Register HttpClient
 builder.Services.AddScoped(sp => new HttpClient());
 
 // Register our service
 builder.Services.AddScoped<IBalldontlieService, BalldontlieService>();
+
+builder.Services.AddSingleton<INbaFavouritesRepository>(_ =>
+    new NbaFavouritesRepository(Path.Combine(builder.Environment.ContentRootPath, "Data", "nba-favourites.json")));
 
 Action<HttpClient> configureFootballData = client =>
 {
@@ -24,6 +28,7 @@ Action<HttpClient> configureFootballData = client =>
 
 builder.Services.AddHttpClient<IStandingsService, FootballDataStandingsService>(configureFootballData);
 builder.Services.AddHttpClient<ITeamService, FootballDataTeamService>(configureFootballData);
+
 builder.Services.AddSingleton<IFavouritesRepository>(_ =>
     new JsonFavouritesRepository(Path.Combine(builder.Environment.ContentRootPath, "Data", "favourites.json")));
 
@@ -33,9 +38,9 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
