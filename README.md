@@ -269,3 +269,4 @@ the class that uses it.
 - Microsoft Learn, Safe storage of app secrets in development: https://learn.microsoft.com/aspnet/core/security/app-secrets
 - Microsoft Learn, Blazor render modes: https://learn.microsoft.com/aspnet/core/blazor/components/render-modes
 - Microsoft Learn, Unit testing C# with xUnit: https://learn.microsoft.com/dotnet/core/testing/unit-testing-with-dotnet-test
+- Microsoft Learn, Cache in-memory in ASP.NET Core: https://learn.microsoft.com/aspnet/core/performance/caching/memory

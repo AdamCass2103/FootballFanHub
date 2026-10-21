@@ -63,7 +63,7 @@ public class JsonFavouritesRepository : IFavouritesRepository
         }
         catch (JsonException)
         {
-            return new List<FavouriteTeam>();   // damaged file: start with an empty list instead of crashing
+            return new List<FavouriteTeam>();   
         }
     }
 
