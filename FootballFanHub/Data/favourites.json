@@ -1,14 +1,14 @@
 [
   {
-    "Id": 64,
-    "Name": "Liverpool FC",
-    "CrestUrl": "https://crests.football-data.org/64.png",
-    "Venue": "Anfield"
-  },
-  {
     "Id": 66,
     "Name": "Manchester United FC",
     "CrestUrl": "https://crests.football-data.org/66.png",
     "Venue": "Old Trafford"
+  },
+  {
+    "Id": 65,
+    "Name": "Manchester City FC",
+    "CrestUrl": "https://crests.football-data.org/65.png",
+    "Venue": "Etihad Stadium"
   }
 ]

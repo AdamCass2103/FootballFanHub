@@ -7,5 +7,23 @@
     "Name": "Celtics",
     "Conference": "East",
     "Division": "Atlantic"
+  },
+  {
+    "Id": 4,
+    "Full_Name": "Charlotte Hornets",
+    "Abbreviation": "CHA",
+    "City": "Charlotte",
+    "Name": "Hornets",
+    "Conference": "East",
+    "Division": "Southeast"
+  },
+  {
+    "Id": 7,
+    "Full_Name": "Dallas Mavericks",
+    "Abbreviation": "DAL",
+    "City": "Dallas",
+    "Name": "Mavericks",
+    "Conference": "West",
+    "Division": "Southwest"
   }
 ]
