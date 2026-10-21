@@ -1,7 +1,6 @@
 using FootballFanHub.Components;
 using FootballFanHub.Services;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -10,15 +9,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddMemoryCache();
 
-// Register HttpClient
-builder.Services.AddScoped(sp => new HttpClient());
-
-// Register our service
-builder.Services.AddScoped<IBalldontlieService, BalldontlieService>();
-
-builder.Services.AddSingleton<INbaFavouritesRepository>(_ =>
-    new NbaFavouritesRepository(Path.Combine(builder.Environment.ContentRootPath, "Data", "nba-favourites.json")));
-
+// Football API — typed HttpClient, config applied once
 Action<HttpClient> configureFootballData = client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["FootballData:BaseUrl"]!);
@@ -26,11 +17,24 @@ Action<HttpClient> configureFootballData = client =>
     client.Timeout = TimeSpan.FromSeconds(10);
 };
 
+// NBA API — typed HttpClient, config applied once 
+Action<HttpClient> configureBalldontlie = client =>
+{
+    client.BaseAddress = new Uri("https://api.balldontlie.io/nba/v1/");
+    client.DefaultRequestHeaders.Add("Authorization", builder.Configuration["Balldontlie:ApiKey"] ?? "");
+    client.Timeout = TimeSpan.FromSeconds(15);
+};
+
 builder.Services.AddHttpClient<IStandingsService, FootballDataStandingsService>(configureFootballData);
 builder.Services.AddHttpClient<ITeamService, FootballDataTeamService>(configureFootballData);
+builder.Services.AddHttpClient<IBalldontlieService, BalldontlieService>(configureBalldontlie);
 
+// Favourites repositories — singleton, shared across users
 builder.Services.AddSingleton<IFavouritesRepository>(_ =>
     new JsonFavouritesRepository(Path.Combine(builder.Environment.ContentRootPath, "Data", "favourites.json")));
+
+builder.Services.AddSingleton<INbaFavouritesRepository>(_ =>
+    new NbaFavouritesRepository(Path.Combine(builder.Environment.ContentRootPath, "Data", "nba-favourites.json")));
 
 var app = builder.Build();
 

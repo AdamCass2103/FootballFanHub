@@ -16,14 +16,11 @@ public class BalldontlieService : IBalldontlieService
 {
     private readonly HttpClient _http;
     private readonly IMemoryCache _cache;
-    private readonly string _apiKey;
 
-    public BalldontlieService(HttpClient http, IMemoryCache cache, IConfiguration config)
+    public BalldontlieService(HttpClient http, IMemoryCache cache)
     {
         _http = http;
         _cache = cache;
-        // Read key from configuration, never hardcode
-        _apiKey = config["Balldontlie:ApiKey"] ?? throw new InvalidOperationException("API Key not configured");
     }
 
     // The team list rarely changes, so keep it for a day
@@ -58,12 +55,8 @@ public class BalldontlieService : IBalldontlieService
         if (_cache.TryGetValue(cacheKey, out List<T>? cached) && cached is not null)
             return cached;
 
-        var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            $"https://api.balldontlie.io/nba/v1/{endpoint}");
-        request.Headers.Add("Authorization", _apiKey);
-
-        var response = await _http.SendAsync(request);
+        // Base address and auth header are configured once in Program.cs
+        var response = await _http.GetAsync(endpoint);
 
         if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
         {

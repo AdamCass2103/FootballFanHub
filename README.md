@@ -56,10 +56,6 @@ with a shared navigation menu and a Football section and an NBA section.
 | **football-data.org** | Football teams, fixtures, results, standings | https://www.football-data.org/documentation/quickstart |
 | **balldontlie** | NBA teams, games, player statistics | https://docs.balldontlie.io/ |
 
-NBA team logos are images served from ESPN's public CDN
-(`https://a.espncdn.com/i/teamlogos/nba/500/{abbreviation}.png`). This is an
-image CDN, **not** a third data API. All NBA *data* comes from balldontlie.
-
 ---
 
 ## 3. Technologies
